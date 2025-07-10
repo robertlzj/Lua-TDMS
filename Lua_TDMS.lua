@@ -41,14 +41,14 @@ local tdsType={
 	SingleFloat=9,
 	DoubleFloat=10,
 	String=0x20,
-	Boolean=0x21,--not handled
-	TimeStamp=0x44,--not handled
+	Boolean=0x21,
+	TimeStamp=0x44,
 }
 local kToc={
 	MetaData=0x1<<1,
 	RawData=0x1<<3,
 	InterleavedData=0x1<<5,--	interleaved / contiguous
-	BigEndian=0x1<<6,--	big-endian / little-endian
+	BigEndian=0x1<<6,--	big-endian / little-endian [default]
 										--	only little-endian for now
 	NewObjList=0x1<<2,
 }
@@ -60,6 +60,7 @@ local Number_To_Byte=Utility.Number_To_Byte
 local Table_Append=Utility.Table_Append
 local Bytes_To_String=Utility.Bytes_To_String
 local Write_String=Utility.Write_String
+local Write_Timestamp=Utility.Write_Timestamp
 
 local function Write_Object_Length_Path(Stream,Group_Name,Channel_Name)
 	local Object_Path="/"..
@@ -109,7 +110,10 @@ local tdsType_2_Data_Package_Method={
 			table.insert(Stream,string.byte(Char))
 		end
 	end,
-	[tdsType.TimeStamp]=false,
+	[tdsType.Boolean]=function(Stream,Value)
+		Number_To_Byte(type(Value)=='boolean' and (Value and 1 or 0) or Value,1,Stream)
+	end,
+	[tdsType.TimeStamp]=Write_Timestamp,
 }
 
 local Index_Length_Of_Remaining_Segment
@@ -140,7 +144,9 @@ local function Detect_TDMS_Type(Value)
 		Lua_Type=='string' and tdsType.String
 		or (Lua_Type=='number'
 			and math.type(Value)=='integer' and tdsType.I32
-			or assert(math.type(Value)=='float') and tdsType.DoubleFloat)
+			or (math.type(Value)=='float' and tdsType.DoubleFloat))
+		or Lua_Type=='table' and tdsType.TimeStamp
+		or Lua_Type=='boolean' and tdsType.Boolean
 	return TDMS_Type
 end
 
@@ -148,7 +154,7 @@ local Set_Meta_Data do
 	local function Generate_Group_Channel_List(Data)
 		local Group_List={}
 		for Key,Value in pairs(Data) do
-			if type(Value)=='table' then
+			if type(Value)=='table' and Value[0]~=tdsType.TimeStamp then
 				table.insert(Group_List,Key)
 			end
 		end
@@ -211,7 +217,7 @@ local Set_Meta_Data do
 			Table_Append(Stream,false,false,false,false)
 			local Properties_List={}
 			for Key,Value in pairs(Object) do
-				if type(Value)~='table' and type(Key)~='number' and Object_Retained[Key]~=Value then
+				if (type(Value)~='table' or (Value[0]==tdsType.TimeStamp and type(Value[1])=='number')) and type(Key)~='number' and Object_Retained[Key]~=Value then
 					Object_Retained[Key]=Value
 					new_write_count_of_properties=new_write_count_of_properties+1
 					local Property_Name=Key
