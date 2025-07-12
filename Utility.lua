@@ -1,4 +1,7 @@
 local Is_Test=not ...
+if Is_Test then
+	print"Lua_TDMS.Utility: Test"
+end
 
 local Number_To_Byte do
 	function Number_To_Byte(Number,Byte_Length,Stream,Input)
@@ -73,24 +76,18 @@ local Write_Timestamp do--Write_Timestamp
 	local Format_Byte=Little_Endian..'I'..Part_Byte_Count
 	--	I: unsigned int
 	local Split=2^(8*Part_Byte_Count)
-	local TDMS_Epoch_Start_Second=-2082873600+86400
-	assert(
+	local TDMS_Epoch_Start_Second=-2082873600-28800*2+86400
+	assert(not Is_Test or (
 		os.time({year=1970,month=1,day=1,hour=8})==0
 		and
 		os.time{
 			year=1904,month=1,day=1,
 			hour=0,min=0,sec=0,
 		}==nil
-	)
+	))--error when run time, get: "time result cannot be represented in this installation"
+	local Method='little-endian'
 	function Write_Timestamp(Stream,Date_Millisecond)
 		local Second,Millisecond=table.unpack(Date_Millisecond)
-		local TDMS_Epoch_Second=Second-TDMS_Epoch_Start_Second
-		for Byte in string.gmatch(string.pack(Little_Endian..'i8',TDMS_Epoch_Second),'(.)') do
-			table.insert(Stream,string.byte(Byte))
-		end
-		if false--[[alternative]]then
-			Number_To_Byte(TDMS_Epoch_Second,8,Stream)
-		end
 		----
 		Millisecond=Millisecond or 0
 		assert(0<=Millisecond and Millisecond<1000)
@@ -111,6 +108,14 @@ local Write_Timestamp do--Write_Timestamp
 		if false--[[alternative]]then
 			Number_To_Byte(High_Part,4,Stream)
 		end
+		----
+		local TDMS_Epoch_Second=Second-TDMS_Epoch_Start_Second
+		for Byte in string.gmatch(string.pack(Little_Endian..'i8',TDMS_Epoch_Second),'(.)') do
+			table.insert(Stream,string.byte(Byte))
+		end
+		if false--[[alternative]]then
+			Number_To_Byte(TDMS_Epoch_Second,8,Stream)
+		end
 	end
 	if Is_Test then
 		--from [LabVIEW Timestamp Overview - NI](https://www.ni.com/en/support/documentation/supplemental/08/labview-timestamp-overview.html)
@@ -122,8 +127,8 @@ local Write_Timestamp do--Write_Timestamp
 				0,0,0,0,0,0,0,0
 			}
 			for Index,Char in ipairs(Stream) do
-				assert(Result[Index]==Char)
 				io.write(string.format('%02x ',Char))
+				assert(Result[Index]==Char)
 			end
 			print''
 		end
@@ -132,12 +137,12 @@ local Write_Timestamp do--Write_Timestamp
 			local Stream={}
 			Write_Timestamp(Stream,{TDMS_Epoch_Start_Second-1,500})
 			local Result={
+				0,0,0,0,0,0,0,0x80,
 				0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
-				0,0,0,0,0,0,0,0x80
 			}
 			for Index,Char in ipairs(Stream) do
-				assert(Result[Index]==Char)
 				io.write(string.format('%02x ',Char))
+				assert(Result[Index]==Char)
 			end
 			print''
 		end
@@ -145,11 +150,13 @@ local Write_Timestamp do--Write_Timestamp
 		do
 			local Stream={}
 			Write_Timestamp(Stream,{os.time({year=2002,month=1,day=1,hour=0}),800})
-			local Result={0x00,0x5B,0x55,0xB8,0,0,0,0,
-				false,false,0xCC,0xCC,0xCC,0xCC,0xCC,0xCC,}
+			local Result={
+				false,false,0xCC,0xCC,0xCC,0xCC,0xCC,0xCC,
+				0x00,0x3C,0x56,0xB8,0,0,0,0,
+			}
 			for Index,Char in ipairs(Stream) do
-				assert(not Result[Index] or Result[Index]==Char)
 				io.write(string.format('%02x ',Char))
+				assert(not Result[Index] or Result[Index]==Char)
 			end
 			print''
 		end

@@ -29,6 +29,10 @@
 
 ----------------
 
+local Use_tdsType_U8_Instead_Of_Boolean_In_Raw_Data=true
+
+----------------
+
 local tdsType={
 	I8=1,
 	I16=2,
@@ -55,7 +59,7 @@ local kToc={
 
 ----------------
 
-;	local Utility=require'Utility'
+;	local Utility=require'Lua_TDMS.Utility'
 local Number_To_Byte=Utility.Number_To_Byte
 local Table_Append=Utility.Table_Append
 local Bytes_To_String=Utility.Bytes_To_String
@@ -72,7 +76,13 @@ end
 
 local tdsType_2_Data_Package_Method={
 	[tdsType.U8]=function(Stream,Value)
-		Number_To_Byte(Value,1,Stream)
+		local Target_Value
+		if type(Value)=='boolean' then
+			Target_Value=Value and 1 or 0
+		else
+			Target_Value=Value
+		end
+		Number_To_Byte(Target_Value,1,Stream)
 	end,
 	[tdsType.U16]=function(Stream,Value)
 		Number_To_Byte(Value,2,Stream)
@@ -96,12 +106,12 @@ local tdsType_2_Data_Package_Method={
 		Number_To_Byte(Value,8,Stream)
 	end,
 	[tdsType.SingleFloat]=function(Stream,Value)
-		for Char in string.gmatch(string.pack('<f',Value)) do
+		for Char in string.gmatch(string.pack('<f',Value),'.') do
 			table.insert(Stream,string.byte(Char))
 		end
 	end,
 	[tdsType.DoubleFloat]=function(Stream,Value)
-		for Char in string.gmatch(string.pack('<d',Value)) do
+		for Char in string.gmatch(string.pack('<d',Value),'.') do
 			table.insert(Stream,string.byte(Char))
 		end
 	end,
@@ -111,7 +121,9 @@ local tdsType_2_Data_Package_Method={
 		end
 	end,
 	[tdsType.Boolean]=function(Stream,Value)
-		Number_To_Byte(type(Value)=='boolean' and (Value and 1 or 0) or Value,1,Stream)
+		Number_To_Byte(
+			type(Value)=='boolean' and (Value and 1 or 0) or Value
+			,1,Stream)
 	end,
 	[tdsType.TimeStamp]=Write_Timestamp,
 }
@@ -138,15 +150,23 @@ local function Set_Lead_In(TDMS)
 	return TDMS
 end
 
-local function Detect_TDMS_Type(Value)
+local function Detect_TDMS_Type(Value,Data_Type)
 	local Lua_Type=type(Value)
 	local TDMS_Type=
 		Lua_Type=='string' and tdsType.String
 		or (Lua_Type=='number'
-			and math.type(Value)=='integer' and tdsType.I32
+			and (math.type(Value)=='integer' and tdsType.I32
 			or (math.type(Value)=='float' and tdsType.DoubleFloat))
+		)
 		or Lua_Type=='table' and tdsType.TimeStamp
-		or Lua_Type=='boolean' and tdsType.Boolean
+		or Lua_Type=='boolean' and (
+			Use_tdsType_U8_Instead_Of_Boolean_In_Raw_Data and
+				(
+					Data_Type=='property value' and tdsType.Boolean
+					or (assert(Data_Type=='raw data') and  tdsType.U8)
+				)
+				or tdsType.Boolean
+			)
 	return TDMS_Type
 end
 
@@ -177,7 +197,7 @@ local Set_Meta_Data do
 		
 		local Raw_Data_Index_Retained=Channel_Retained[Channel_Retained]
 		
-		local Data_Type=Channel[0] or Detect_TDMS_Type(Channel[1])
+		local Data_Type=Channel[0] or Detect_TDMS_Type(Channel[1],'raw data')
 		if Raw_Data_Index_Retained.Data_Type~=Data_Type and assert(not Raw_Data_Index_Retained.Data_Type,"Data type can not change after creation!") then
 			Is_Raw_Data_Index_Changed=true
 			Raw_Data_Index_Retained.Data_Type=Data_Type
@@ -202,7 +222,7 @@ local Set_Meta_Data do
 		local function Write_Porperty(Stream,Property_Name,Property_Value)
 			Write_String(Stream,Property_Name)
 			--write data type of the property value
-			local Property_Type=Detect_TDMS_Type(Property_Value)
+			local Property_Type=Detect_TDMS_Type(Property_Value,'property value')
 			--write value of the property
 			Number_To_Byte(Property_Type,4,Stream)
 			if Property_Type==tdsType.String then
@@ -339,7 +359,7 @@ end
 local function Set_Raw_Data(TDMS)
 	local Raw_Data={}
 	for Index,Channel in ipairs(TDMS.Channel_List) do
-		local Data_Type=Channel[0] or Detect_TDMS_Type(Channel[1])
+		local Data_Type=Channel[0] or Detect_TDMS_Type(Channel[1],'raw data')
 		local Append_Data=tdsType_2_Data_Package_Method[Data_Type]
 		for Index,Data in ipairs(Channel) do
 			Append_Data(Raw_Data,Data)
