@@ -265,7 +265,7 @@ TDMS=Lua_TDMS.New()
 				--	By default, (RAW DATA of boolean data type) will be stored using `tdsType.U8`.
 				--		Switch by `Use_tdsType_U8_Instead_Of_Boolean_In_Raw_Data` variable.
 				true,false,1,
-			}
+			},
 		},
 	}
 Output_Result(TDMS.Lead_In,{
@@ -305,4 +305,42 @@ Output_Result(TDMS.Raw_Data,{
 	0x01,0x00,0x01,
 })
 
+print"Bool data type test OK"
+
+--------
+
 File_Handle:close()
+local File_Handle=
+--	io.open('Test_File.tdms','r+b') or 
+	io.open('Test_File.tdms','wb')
+
+TDMS=Lua_TDMS.New()
+	:Auto_Write_File(File_Handle)
+	:Write_Data{
+		Time_Values={
+			Time={
+				{os.time({year=2002,month=1,day=1,hour=0}),800},
+				{os.time({year=2020,month=1,day=1,})},
+				{os.time({year=2023,month=7,day=10,hour=22}),0},
+				{os.time({year=2025,month=7,day=10,hour=23}),999},
+			},
+			Value_1={
+				1.0,--only float (IEEE 754) support NaN
+				2.0,
+				0/0,
+				4.0,
+			},
+			Value_2={
+				0/0,--only float (IEEE 754) support NaN
+				2.5,
+				3.5,
+				0/0,
+			},
+		},
+	}
+
+print"NaN (Not a number) as gap test OK"
+
+File_Handle:close()
+
+print"Test finish"

@@ -3,26 +3,26 @@ if Is_Test then
 	print"Lua_TDMS.Utility: Test"
 end
 
-local Number_To_Byte do
-	function Number_To_Byte(Number,Byte_Length,Stream,Input)
+local Integer_To_Byte do
+	function Integer_To_Byte(Integer,Byte_Length,Stream,OverWrite_Or_Insert_Index)
 		--	Unsigned_Number_To_Byte
-		local Index,Is_Insert_Or_Overwrite if Input then
-			Index=math.abs(Input)
-			if Input<0 then
-				Is_Insert_Or_Overwrite='overwirte'
+		local Index,Write_Method if OverWrite_Or_Insert_Index then
+			Index=math.abs(OverWrite_Or_Insert_Index)
+			if OverWrite_Or_Insert_Index<0 then
+				Write_Method='overwirte'
 			else
-				Is_Insert_Or_Overwrite='insert'
+				Write_Method='insert'
 			end
 		else
 			Index=#Stream+1
-			Is_Insert_Or_Overwrite='insert'
+			Write_Method='insert'
 		end
-		assert(Number<=(0x100^Byte_Length-1))
+		assert(Integer<=(0x100^Byte_Length-1))
 		for Byte_Position=1,Byte_Length do
 			local Byte_Offset=Byte_Position-1
 			local Bit_Offset=Byte_Offset*8
-			local Byte=(Number>>Bit_Offset)&0xFF
-			if Is_Insert_Or_Overwrite=='insert' then
+			local Byte=(Integer>>Bit_Offset)&0xFF
+			if Write_Method=='insert' then
 				table.insert(Stream,Index+Byte_Offset,Byte)
 			else
 				Stream[Index+Byte_Offset]=Byte
@@ -32,20 +32,20 @@ local Number_To_Byte do
 	if Is_Test then
 		local IsEqual=require'Table'.IsEqual
 		local Container={}
-		Number_To_Byte(255,4,Container)
+		Integer_To_Byte(255,4,Container)
 		assert(IsEqual(Container,{0xff,0,0,0}))
 		Container={}
-		Number_To_Byte(0xffFFffFF,4,Container,1)
+		Integer_To_Byte(0xffFFffFF,4,Container,1)
 		assert(IsEqual(Container,{0xff,0xff,0xff,0xff}))
 		--
 		Container={}
-		Number_To_Byte(-125,1,Container)
+		Integer_To_Byte(-125,1,Container)
 		assert(IsEqual(Container,{0x83}))
 		--
 		Container={}
-		Number_To_Byte(-125,4,Container)
+		Integer_To_Byte(-125,4,Container)
 		assert(IsEqual(Container,{0x83,0xff,0xff,0xff}))
-		print"'Unsigned_Number_To_Byte' test OK"
+		print"'Unsigned_Integer_To_Byte' test OK"
 	end
 end
 
@@ -62,7 +62,7 @@ end
 
 local function Write_String(Stream,String)
 	local String_Length=#String
-	Number_To_Byte(String_Length,4,Stream)
+	Integer_To_Byte(String_Length,4,Stream)
 	for Char in string.gmatch(String,'(.)') do
 		--print(string.format('%x',string.byte(Byte)))
 		table.insert(Stream,string.byte(Char))
@@ -98,7 +98,7 @@ local Write_Timestamp do--Write_Timestamp
 			table.insert(Stream,string.byte(Byte))
 		end
 		if false--[[alternative]]then
-			Number_To_Byte(Low_Part,4,Stream)
+			Integer_To_Byte(Low_Part,4,Stream)
 		end
 		local High_Part=Tick_Count//Split
 		local High_Part_String=string.pack(Format_Byte,High_Part)
@@ -106,7 +106,7 @@ local Write_Timestamp do--Write_Timestamp
 			table.insert(Stream,string.byte(Byte))
 		end
 		if false--[[alternative]]then
-			Number_To_Byte(High_Part,4,Stream)
+			Integer_To_Byte(High_Part,4,Stream)
 		end
 		----
 		local TDMS_Epoch_Second=Second-TDMS_Epoch_Start_Second
@@ -114,7 +114,7 @@ local Write_Timestamp do--Write_Timestamp
 			table.insert(Stream,string.byte(Byte))
 		end
 		if false--[[alternative]]then
-			Number_To_Byte(TDMS_Epoch_Second,8,Stream)
+			Integer_To_Byte(TDMS_Epoch_Second,8,Stream)
 		end
 	end
 	if Is_Test then
@@ -164,7 +164,7 @@ local Write_Timestamp do--Write_Timestamp
 end
 
 return {
-	Number_To_Byte=Number_To_Byte,
+	Integer_To_Byte=Integer_To_Byte,
 	Table_Append=Table_Append,
 	Bytes_To_String=Bytes_To_String,
 	Write_String=Write_String,

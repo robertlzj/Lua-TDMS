@@ -60,7 +60,7 @@ local kToc={
 ----------------
 
 ;	local Utility=require'Lua_TDMS.Utility'
-local Number_To_Byte=Utility.Number_To_Byte
+local Integer_To_Byte=Utility.Integer_To_Byte
 local Table_Append=Utility.Table_Append
 local Bytes_To_String=Utility.Bytes_To_String
 local Write_String=Utility.Write_String
@@ -74,6 +74,8 @@ local function Write_Object_Length_Path(Stream,Group_Name,Channel_Name)
 	Write_String(Stream,Object_Path)
 end
 
+local NaN=0/0
+
 local tdsType_2_Data_Package_Method={
 	[tdsType.U8]=function(Stream,Value)
 		local Target_Value
@@ -82,28 +84,28 @@ local tdsType_2_Data_Package_Method={
 		else
 			Target_Value=Value
 		end
-		Number_To_Byte(Target_Value,1,Stream)
+		Integer_To_Byte(Target_Value,1,Stream)
 	end,
 	[tdsType.U16]=function(Stream,Value)
-		Number_To_Byte(Value,2,Stream)
+		Integer_To_Byte(Value,2,Stream)
 	end,
 	[tdsType.U32]=function(Stream,Value)
-		Number_To_Byte(Value,4,Stream)
+		Integer_To_Byte(Value,4,Stream)
 	end,
 	[tdsType.U64]=function(Stream,Value)
-		Number_To_Byte(Value,8,Stream)
+		Integer_To_Byte(Value,8,Stream)
 	end,
 	[tdsType.I8]=function(Stream,Value)
-		Number_To_Byte(Value,1,Stream)
+		Integer_To_Byte(Value,1,Stream)
 	end,
 	[tdsType.I16]=function(Stream,Value)
-		Number_To_Byte(Value,2,Stream)
+		Integer_To_Byte(Value,2,Stream)
 	end,
 	[tdsType.I32]=function(Stream,Value)
-		Number_To_Byte(Value,4,Stream)
+		Integer_To_Byte(Value,4,Stream)
 	end,
 	[tdsType.I64]=function(Stream,Value)
-		Number_To_Byte(Value,8,Stream)
+		Integer_To_Byte(Value,8,Stream)
 	end,
 	[tdsType.SingleFloat]=function(Stream,Value)
 		for Char in string.gmatch(string.pack('<f',Value),'.') do
@@ -121,7 +123,7 @@ local tdsType_2_Data_Package_Method={
 		end
 	end,
 	[tdsType.Boolean]=function(Stream,Value)
-		Number_To_Byte(
+		Integer_To_Byte(
 			type(Value)=='boolean' and (Value and 1 or 0) or Value
 			,1,Stream)
 	end,
@@ -186,12 +188,12 @@ local Set_Meta_Data do
 	local Same_Raw_Data_As_Previous_Segment=0x00000000
 	local function Write_Raw_Data_Index(Stream,Object,Channel_Retained)
 		if Object==false--[[Group]] then
-			Number_To_Byte(No_Raw_Data,4,Stream)
+			Integer_To_Byte(No_Raw_Data,4,Stream)
 			return
 		end
 		local Channel=Object
 		local Length_Of_Index_Information=4+4+4+8
-		Number_To_Byte(Length_Of_Index_Information,4,Stream)
+		Integer_To_Byte(Length_Of_Index_Information,4,Stream)
 		
 		local Is_Raw_Data_Index_Changed
 		
@@ -202,17 +204,17 @@ local Set_Meta_Data do
 			Is_Raw_Data_Index_Changed=true
 			Raw_Data_Index_Retained.Data_Type=Data_Type
 		end
-		Number_To_Byte(Data_Type,4,Stream)
+		Integer_To_Byte(Data_Type,4,Stream)
 		
 		local Array_Dimension=1
-		Number_To_Byte(Array_Dimension,4,Stream)
+		Integer_To_Byte(Array_Dimension,4,Stream)
 		
 		local Number_of_Values=#Channel--udint
 		if Raw_Data_Index_Retained.Number_of_Values~=Number_of_Values then
 			Is_Raw_Data_Index_Changed=true
 			Raw_Data_Index_Retained.Number_of_Values=Number_of_Values
 		end
-		Number_To_Byte(Number_of_Values,8,Stream)
+		Integer_To_Byte(Number_of_Values,8,Stream)
 		local Total_Size=nil--bytes
 		----
 		return Is_Raw_Data_Index_Changed
@@ -224,7 +226,7 @@ local Set_Meta_Data do
 			--write data type of the property value
 			local Property_Type=Detect_TDMS_Type(Property_Value,'property value')
 			--write value of the property
-			Number_To_Byte(Property_Type,4,Stream)
+			Integer_To_Byte(Property_Type,4,Stream)
 			if Property_Type==tdsType.String then
 				Write_String(Stream,Property_Value)
 			else
@@ -249,7 +251,7 @@ local Set_Meta_Data do
 				local Property_Value=Object[Property_Name]
 				Write_Porperty(Stream,Property_Name,Property_Value)
 			end
-			Number_To_Byte(new_write_count_of_properties,4,Stream,-Position_At_Number_Of_Properties)
+			Integer_To_Byte(new_write_count_of_properties,4,Stream,-Position_At_Number_Of_Properties)
 			return new_write_count_of_properties>0
 		end
 	end
@@ -330,7 +332,7 @@ local Set_Meta_Data do
 					local Is_New_Write_Properties=Write_Porperties(Meta_Data,Channel,Channel_Retained)
 					if Is_New_Write_Properties or not Group_Retained[Channel_Name]  then
 						if not Is_Raw_Data_Index_Changed then
-							Number_To_Byte(Same_Raw_Data_As_Previous_Segment,4,Meta_Data,Position_At_Raw_Data_Index)
+							Integer_To_Byte(Same_Raw_Data_As_Previous_Segment,4,Meta_Data,Position_At_Raw_Data_Index)
 						end
 						new_write_object_count=new_write_object_count+1
 						Group_Retained[Channel_Name]=Channel_Retained
@@ -341,7 +343,7 @@ local Set_Meta_Data do
 			end
 		end
 		if new_write_object_count>0 then
-			Number_To_Byte(new_write_object_count,4,Meta_Data,-Position_At_Number_Of_Objects)
+			Integer_To_Byte(new_write_object_count,4,Meta_Data,-Position_At_Number_Of_Objects)
 			TDMS.Lead_In[Index_Toc]=TDMS.Lead_In[Index_Toc]|kToc.NewObjList
 		else
 			Remove_From_Position(Meta_Data,Position_At_Number_Of_Objects)
@@ -349,7 +351,7 @@ local Set_Meta_Data do
 		end
 		TDMS.Meta_Data=Meta_Data
 		--------
-		Number_To_Byte(#Meta_Data,8,TDMS.Lead_In,-Index_Length_Of_Meta)
+		Integer_To_Byte(#Meta_Data,8,TDMS.Lead_In,-Index_Length_Of_Meta)
 		TDMS.Lead_In[Index_Toc]=TDMS.Lead_In[Index_Toc]
 			|(#TDMS.Meta_Data>0 and kToc.MetaData or 0)
 		return TDMS
@@ -367,7 +369,7 @@ local function Set_Raw_Data(TDMS)
 	end
 	TDMS.Raw_Data=Raw_Data
 	local Length_Of_Remaining_Segment=#TDMS.Meta_Data+#TDMS.Raw_Data
-	Number_To_Byte(Length_Of_Remaining_Segment,8,TDMS.Lead_In,-Index_Length_Of_Remaining_Segment)
+	Integer_To_Byte(Length_Of_Remaining_Segment,8,TDMS.Lead_In,-Index_Length_Of_Remaining_Segment)
 	TDMS.Lead_In[Index_Toc]=TDMS.Lead_In[Index_Toc]
 		|(#TDMS.Raw_Data and kToc.RawData or 0)
 	return TDMS
@@ -381,7 +383,7 @@ local function Write_File(TDMS,File_Handle)
 		TDMS.Length_Of_Remaining_Segment=Length_Of_Remaining_Segment
 		File_Handle:seek('set',TDMS.Lead_In_File_Offset+Index_Length_Of_Remaining_Segment-1)
 		local Length_Of_Remaining_Segment_Data_List={}
-		Number_To_Byte(Length_Of_Remaining_Segment,8,Length_Of_Remaining_Segment_Data_List)
+		Integer_To_Byte(Length_Of_Remaining_Segment,8,Length_Of_Remaining_Segment_Data_List)
 		File_Handle:write(Bytes_To_String(Length_Of_Remaining_Segment_Data_List))
 		File_Handle:seek('end')
 	else
